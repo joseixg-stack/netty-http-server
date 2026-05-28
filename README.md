@@ -1,47 +1,94 @@
-Netty Gateway
-一个基于 Java Netty 构建的轻量级 API 网关。旨在学习高性能网络编程与微服务架构的流量调度原理。
+# Netty HTTP Server
 
-🚀 项目特性
-高性能： 基于 Netty 异步非阻塞 IO 架构。
+一个基于 Netty 的简易 HTTP 服务器示例。当前项目重点是：
 
-责任链模式： 灵活的插件系统（Filter Chain），支持自定义鉴权、限流等功能。
+- 监听 `8080` 端口
+- 打印每次请求的路径
+- 使用责任链模式定义并执行 `GatewayFilter`
+- 通过 `FilterChain` 统一管理和执行过滤器
+- 返回简单的 `200 OK` 文本响应
 
-动态路由： 支持基于路径前缀的请求转发。
+## 当前架构
 
-🏗️ 架构概览
-### 架构概览
 ```mermaid
 graph LR
-    Client[客户端] --> Gateway[API 网关]
-    subgraph 网关内部
-        Filter[Filter Chain] --> Router[路由转发]
-    end
-    Gateway --> Filter
-    Router --> Service[后端服务]
+    Client["HTTP Client"] --> Handler["Netty RequestHandler"]
+    Handler --> Chain["FilterChain"]
+    Chain --> LogFilter["PathLoggingFilter"]
+    LogFilter --> Terminal["Terminal Handler"]
+    Terminal --> Response["200 OK Response"]
+```
 
-🛠️ 技术栈
-核心框架： Netty 4.1.x
+## 目录结构
 
-构建工具： Apache Maven
+```text
+src/main/java/com/example/nettyhttp
+├── filter
+│   ├── Chain.java
+│   ├── FilterChain.java
+│   ├── GatewayFilter.java
+│   ├── PathLoggingFilter.java
+│   ├── Request.java
+│   └── Response.java
+└── server
+    └── NettyHttpServer.java
+```
 
-开发语言： Java 17+
+## 运行
 
-⚡ 快速开始
-克隆项目： git clone [https://github.com/joseixg-stack/netty-http-server.git]
+确保本机已安装 JDK 17 和 Maven，然后执行：
 
-构建项目： mvn clean package
+```powershell
+mvn clean package
+mvn exec:java
+```
 
-运行网关： java -jar target/gateway-1.0.jar
+访问：
 
-验证： 发送请求 http://localhost:8080/hello
+```powershell
+curl http://localhost:8080/hello
+```
 
-📝 开发进度 (Roadmap)
-[x] 基于 Netty 的 HTTP 基础服务器搭建
+服务端终端会输出：
 
-[ ] 实现责任链 Filter 接口
+```text
+Request path: /hello
+```
 
-[ ] 完成基础路由转发逻辑
+客户端会收到：
 
-[ ] 集成 JWT 鉴权插件
+```text
+OK
+```
 
-💡 通过这个项目，深入理解Netty 的 EventLoop 模型以及如何优雅地处理 HTTP 报文。)
+## 过滤器接口
+
+`GatewayFilter` 的核心方法：
+
+```java
+void filter(Request request, Response response, Chain chain) throws Exception;
+```
+
+自定义过滤器处理完成后，继续执行后续过滤器：
+
+```java
+chain.next(request, response);
+```
+
+如果过滤器已经写出响应，可以不调用 `chain.next(...)`，后续过滤器和默认处理逻辑就不会继续执行。
+
+## 已实现
+
+- Netty HTTP 服务启动
+- `GatewayFilter` 接口
+- `FilterChain` 责任链执行
+- 请求路径打印过滤器
+- 简单文本响应封装
+
+## 暂未实现
+
+- 动态路由转发
+- 鉴权
+- 限流
+- 后端服务代理
+
