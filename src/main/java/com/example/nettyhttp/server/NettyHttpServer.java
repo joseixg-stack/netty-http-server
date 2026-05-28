@@ -16,6 +16,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 
@@ -70,6 +71,12 @@ public class NettyHttpServer {
             Response gatewayResponse = new Response(channelContext);
             FilterChain chain = new FilterChain(filters, (req, res) -> res.text("OK"));
             chain.filter(gatewayRequest, gatewayResponse);
+        }
+
+        @Override
+        public void exceptionCaught(ChannelHandlerContext channelContext, Throwable cause) {
+            cause.printStackTrace();
+            new Response(channelContext).text(HttpResponseStatus.INTERNAL_SERVER_ERROR, "Internal Server Error");
         }
     }
 }
