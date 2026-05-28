@@ -1,43 +1,47 @@
-# Netty HTTP Server
+Netty Gateway
+一个基于 Java Netty 构建的轻量级 API 网关。旨在学习高性能网络编程与微服务架构的流量调度原理。
 
-一个基于 Netty 的简易 HTTP 服务器示例：
+🚀 项目特性
+高性能： 基于 Netty 异步非阻塞 IO 架构。
 
-- 监听 `8080` 端口
-- 打印每次请求的路径
-- 使用责任链模式定义并执行 `GatewayFilter`
-- 通过 `FilterChain` 统一管理和执行过滤器
+责任链模式： 灵活的插件系统（Filter Chain），支持自定义鉴权、限流等功能。
 
-## 运行
+动态路由： 支持基于路径前缀的请求转发。
 
-确保本机已安装 JDK 17 和 Maven，然后执行：
+🏗️ 架构概览
+### 架构概览
+```mermaid
+graph LR
+    Client[客户端] --> Gateway[API 网关]
+    subgraph 网关内部
+        Filter[Filter Chain] --> Router[路由转发]
+    end
+    Gateway --> Filter
+    Router --> Service[后端服务]
 
-```powershell
-mvn clean package
-mvn exec:java
-```
+🛠️ 技术栈
+核心框架： Netty 4.1.x
 
-访问：
+构建工具： Apache Maven
 
-```powershell
-curl http://localhost:8080/hello
-```
+开发语言： Java 17+
 
-终端会输出：
+⚡ 快速开始
+克隆项目： git clone [https://github.com/joseixg-stack/netty-http-server.git]
 
-```text
-Request path: /hello
-```
+构建项目： mvn clean package
 
-## 过滤器接口
+运行网关： java -jar target/gateway-1.0.jar
 
-`GatewayFilter` 的核心方法：
+验证： 发送请求 http://localhost:8080/hello
 
-```java
-void filter(Request request, Response response, Chain chain) throws Exception;
-```
+📝 开发进度 (Roadmap)
+[x] 基于 Netty 的 HTTP 基础服务器搭建
 
-自定义过滤器需要在处理完成后调用：
+[ ] 实现责任链 Filter 接口
 
-```java
-chain.next(request, response);
-```
+[ ] 完成基础路由转发逻辑
+
+[ ] 集成 JWT 鉴权插件
+
+💡 通过这个项目，深入理解Netty 的 EventLoop 模型以及如何优雅地处理 HTTP 报文。)
