@@ -4,23 +4,23 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.QueryStringDecoder;
 
-public class HttpRequestContext {
+public class Request {
     private final ChannelHandlerContext channelContext;
-    private final FullHttpRequest request;
+    private final FullHttpRequest rawRequest;
     private final String path;
 
-    public HttpRequestContext(ChannelHandlerContext channelContext, FullHttpRequest request) {
+    public Request(ChannelHandlerContext channelContext, FullHttpRequest rawRequest) {
         this.channelContext = channelContext;
-        this.request = request;
-        this.path = new QueryStringDecoder(request.uri()).path();
+        this.rawRequest = rawRequest;
+        this.path = new QueryStringDecoder(rawRequest.uri()).path();
     }
 
     public ChannelHandlerContext channelContext() {
         return channelContext;
     }
 
-    public FullHttpRequest request() {
-        return request;
+    public FullHttpRequest rawRequest() {
+        return rawRequest;
     }
 
     public String path() {

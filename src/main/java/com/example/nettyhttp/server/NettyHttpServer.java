@@ -1,11 +1,11 @@
 package com.example.nettyhttp.server;
 
-import com.example.nettyhttp.filter.DefaultFilterChain;
-import com.example.nettyhttp.filter.Filter;
-import com.example.nettyhttp.filter.HttpRequestContext;
+import com.example.nettyhttp.filter.FilterChain;
+import com.example.nettyhttp.filter.GatewayFilter;
 import com.example.nettyhttp.filter.PathLoggingFilter;
+import com.example.nettyhttp.filter.Request;
+import com.example.nettyhttp.filter.Response;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -15,28 +15,21 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.codec.http.HttpVersion;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class NettyHttpServer {
     private static final int PORT = 8080;
 
     public static void main(String[] args) throws InterruptedException {
-        List<Filter> filters = List.of(new PathLoggingFilter());
+        List<GatewayFilter> filters = List.of(new PathLoggingFilter());
         new NettyHttpServer().start(PORT, filters);
     }
 
-    public void start(int port, List<Filter> filters) throws InterruptedException {
+    public void start(int port, List<GatewayFilter> filters) throws InterruptedException {
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
 
@@ -65,34 +58,18 @@ public class NettyHttpServer {
     }
 
     private static class RequestHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
-        private final List<Filter> filters;
+        private final List<GatewayFilter> filters;
 
-        private RequestHandler(List<Filter> filters) {
+        private RequestHandler(List<GatewayFilter> filters) {
             this.filters = List.copyOf(filters);
         }
 
         @Override
         protected void channelRead0(ChannelHandlerContext channelContext, FullHttpRequest request) throws Exception {
-            HttpRequestContext requestContext = new HttpRequestContext(channelContext, request);
-            DefaultFilterChain chain = new DefaultFilterChain(filters, () -> writeOk(channelContext));
-            chain.doFilter(requestContext);
-        }
-
-        private void writeOk(ChannelHandlerContext channelContext) {
-            byte[] body = "OK".getBytes(StandardCharsets.UTF_8);
-            FullHttpResponse response = new DefaultFullHttpResponse(
-                    HttpVersion.HTTP_1_1,
-                    HttpResponseStatus.OK,
-                    Unpooled.wrappedBuffer(body)
-            );
-
-            response.headers()
-                    .set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8")
-                    .set(HttpHeaderNames.CONTENT_LENGTH, body.length)
-                    .set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-
-            channelContext.writeAndFlush(response).addListener(future -> channelContext.close());
+            Request gatewayRequest = new Request(channelContext, request);
+            Response gatewayResponse = new Response(channelContext);
+            FilterChain chain = new FilterChain(filters, (req, res) -> res.text("OK"));
+            chain.filter(gatewayRequest, gatewayResponse);
         }
     }
 }
-
