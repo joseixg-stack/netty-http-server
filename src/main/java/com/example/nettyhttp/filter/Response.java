@@ -11,8 +11,23 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class Response {
+    private static final Set<String> SKIPPED_RESPONSE_HEADERS = Set.of(
+            "connection",
+            "content-length",
+            "keep-alive",
+            "proxy-authenticate",
+            "proxy-authorization",
+            "te",
+            "trailer",
+            "transfer-encoding",
+            "upgrade"
+    );
+
     private final ChannelHandlerContext channelContext;
     private boolean committed;
 
@@ -29,19 +44,27 @@ public class Response {
     }
 
     public void text(HttpResponseStatus status, String body) {
+        bytes(status.code(), body.getBytes(StandardCharsets.UTF_8), Map.of(HttpHeaderNames.CONTENT_TYPE.toString(), List.of("text/plain; charset=UTF-8")));
+    }
+
+    public void bytes(int statusCode, byte[] bytes, Map<String, List<String>> headers) {
         if (committed) {
             return;
         }
 
-        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         FullHttpResponse response = new DefaultFullHttpResponse(
                 HttpVersion.HTTP_1_1,
-                status,
+                HttpResponseStatus.valueOf(statusCode),
                 Unpooled.wrappedBuffer(bytes)
         );
 
+        headers.forEach((name, values) -> {
+            if (!SKIPPED_RESPONSE_HEADERS.contains(name.toLowerCase())) {
+                response.headers().set(name, values);
+            }
+        });
+
         response.headers()
-                .set(HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8")
                 .set(HttpHeaderNames.CONTENT_LENGTH, bytes.length)
                 .set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
 
@@ -49,4 +72,3 @@ public class Response {
         channelContext.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
     }
 }
-

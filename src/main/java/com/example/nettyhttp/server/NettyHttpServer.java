@@ -1,10 +1,13 @@
 package com.example.nettyhttp.server;
 
+import com.example.nettyhttp.config.GatewayConfig;
 import com.example.nettyhttp.filter.FilterChain;
 import com.example.nettyhttp.filter.GatewayFilter;
 import com.example.nettyhttp.filter.PathLoggingFilter;
 import com.example.nettyhttp.filter.Request;
 import com.example.nettyhttp.filter.Response;
+import com.example.nettyhttp.gateway.ProxyHandler;
+import com.example.nettyhttp.gateway.RouteMatcher;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -23,14 +26,14 @@ import io.netty.handler.codec.http.HttpServerCodec;
 import java.util.List;
 
 public class NettyHttpServer {
-    private static final int PORT = 8080;
-
     public static void main(String[] args) throws InterruptedException {
+        GatewayConfig config = GatewayConfig.load();
         List<GatewayFilter> filters = List.of(new PathLoggingFilter());
-        new NettyHttpServer().start(PORT, filters);
+        FilterChain.TerminalHandler terminalHandler = new ProxyHandler(new RouteMatcher(config.routes()));
+        new NettyHttpServer().start(config.port(), filters, terminalHandler);
     }
 
-    public void start(int port, List<GatewayFilter> filters) throws InterruptedException {
+    public void start(int port, List<GatewayFilter> filters, FilterChain.TerminalHandler terminalHandler) throws InterruptedException {
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
 
@@ -45,12 +48,13 @@ public class NettyHttpServer {
                             channel.pipeline()
                                     .addLast(new HttpServerCodec())
                                     .addLast(new HttpObjectAggregator(1024 * 1024))
-                                    .addLast(new RequestHandler(filters));
+                                    .addLast(new RequestHandler(filters, terminalHandler));
                         }
                     });
 
             ChannelFuture future = bootstrap.bind(port).sync();
             System.out.println("Netty HTTP server started on port " + port);
+            System.out.println("Health check: http://localhost:" + port + "/healthz");
             future.channel().closeFuture().sync();
         } finally {
             bossGroup.shutdownGracefully();
@@ -60,16 +64,18 @@ public class NettyHttpServer {
 
     private static class RequestHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         private final List<GatewayFilter> filters;
+        private final FilterChain.TerminalHandler terminalHandler;
 
-        private RequestHandler(List<GatewayFilter> filters) {
+        private RequestHandler(List<GatewayFilter> filters, FilterChain.TerminalHandler terminalHandler) {
             this.filters = List.copyOf(filters);
+            this.terminalHandler = terminalHandler;
         }
 
         @Override
         protected void channelRead0(ChannelHandlerContext channelContext, FullHttpRequest request) throws Exception {
             Request gatewayRequest = new Request(channelContext, request);
             Response gatewayResponse = new Response(channelContext);
-            FilterChain chain = new FilterChain(filters, (req, res) -> res.text("OK"));
+            FilterChain chain = new FilterChain(filters, terminalHandler);
             chain.filter(gatewayRequest, gatewayResponse);
         }
 
